@@ -96,4 +96,191 @@
                         <th>Fecha</th>
                         <th>Descripción</th>
                         <th>Monto (VND)</th>
-                        <th>Acc
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="expense-list">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- LÓGICA DEL COTIZADOR ---
+    let exchangeRates = {};
+    let dolarBlueVenta = 0;
+
+    async function fetchRates() {
+        try {
+            const responseVND = await fetch('https://open.er-api.com/v6/latest/VND');
+            const dataVND = await responseVND.json();
+            exchangeRates = dataVND.rates;
+            
+            const responseBlue = await fetch('https://dolarapi.com/v1/dolares/blue');
+            const dataBlue = await responseBlue.json();
+            dolarBlueVenta = dataBlue.venta;
+            
+            const lastUpdate = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('rate-update-time').innerText = `Tasas actualizadas a las ${lastUpdate} hs`;
+            convertCurrency(); 
+        } catch (error) {
+            document.getElementById('rate-update-time').innerText = "Modo offline: usando tasas estimadas";
+            exchangeRates = { USD: 0.000039, EUR: 0.000036, JPY: 0.0059 };
+            dolarBlueVenta = 1200; 
+            convertCurrency();
+        }
+    }
+
+    function formatCurrencyValue(value, currencyCode) {
+        return new Intl.NumberFormat('es-AR', { style: 'currency', currency: currencyCode, minimumFractionDigits: 2 }).format(value);
+    }
+
+    function convertCurrency() {
+        const vnd = parseFloat(document.getElementById('quick-vnd').value) || 0;
+        if(Object.keys(exchangeRates).length > 0) {
+            const usdValue = vnd * exchangeRates.USD;
+            
+            document.getElementById('conv-usd').innerText = formatCurrencyValue(usdValue, 'USD');
+            document.getElementById('conv-eur').innerText = formatCurrencyValue(vnd * exchangeRates.EUR, 'EUR');
+            document.getElementById('conv-jpy').innerText = formatCurrencyValue(vnd * exchangeRates.JPY, 'JPY');
+            
+            const arsBlueValue = usdValue * dolarBlueVenta;
+            document.getElementById('conv-ars').innerText = formatCurrencyValue(arsBlueValue, 'ARS');
+        }
+    }
+
+    fetchRates();
+
+    // --- LÓGICA DE GASTOS ---
+    let exchanges = JSON.parse(localStorage.getItem('vn_exchanges')) || [];
+    let expenses = JSON.parse(localStorage.getItem('vn_expenses')) || [];
+
+    function getLocalYYYYMMDD(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    document.getElementById('expense-date').value = getLocalYYYYMMDD(new Date());
+
+    function formatNumber(num) {
+        return new Intl.NumberFormat('es-AR').format(num);
+    }
+
+    function updateDashboard() {
+        const totalCambiado = exchanges.reduce((acc, curr) => acc + curr.vnd, 0);
+        const totalGastado = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+        const saldo = totalCambiado - totalGastado;
+
+        document.getElementById('total-cambiado').innerText = formatNumber(totalCambiado);
+        document.getElementById('total-gastado').innerText = formatNumber(totalGastado);
+        document.getElementById('saldo').innerText = formatNumber(saldo);
+
+        const hoyStr = getLocalYYYYMMDD(new Date());
+        const ayerObj = new Date();
+        ayerObj.setDate(ayerObj.getDate() - 1);
+        const ayerStr = getLocalYYYYMMDD(ayerObj);
+
+        const gastosHoy = expenses.filter(e => e.date === hoyStr).reduce((acc, curr) => acc + curr.amount, 0);
+        const gastosAyer = expenses.filter(e => e.date === ayerStr).reduce((acc, curr) => acc + curr.amount, 0);
+
+        document.getElementById('gastos-hoy').innerText = formatNumber(gastosHoy);
+        document.getElementById('gastos-ayer').innerText = formatNumber(gastosAyer);
+
+        if (expenses.length > 0) {
+            const dates = expenses.map(e => new Date(e.date));
+            const minDate = new Date(Math.min(...dates));
+            const maxDate = new Date(Math.max(...dates));
+            const diffTime = Math.abs(maxDate - minDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+            
+            const promedio = totalGastado / diffDays;
+            document.getElementById('promedio-diario').innerText = formatNumber(Math.round(promedio));
+        } else {
+            document.getElementById('promedio-diario').innerText = "0";
+        }
+
+        renderExpenses();
+    }
+
+    function addExchange() {
+        const usd = parseFloat(document.getElementById('usd-amount').value);
+        const rate = parseFloat(document.getElementById('exchange-rate').value);
+        
+        if (!usd || !rate) {
+            alert('Por favor, completá los dólares y la tasa de cambio.');
+            return;
+        }
+
+        const vnd = usd * rate;
+        exchanges.push({ usd, rate, vnd, date: new Date().toISOString() });
+        localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
+        
+        document.getElementById('usd-amount').value = '';
+        document.getElementById('exchange-rate').value = '';
+        updateDashboard();
+    }
+
+    function addExpense() {
+        const date = document.getElementById('expense-date').value;
+        const desc = document.getElementById('expense-desc').value;
+        const amount = parseFloat(document.getElementById('expense-amount').value);
+
+        if (!date || !desc || !amount) {
+            alert('Por favor, completá todos los datos del gasto.');
+            return;
+        }
+
+        expenses.push({ id: Date.now(), date, desc, amount });
+        localStorage.setItem('vn_expenses', JSON.stringify(expenses));
+        
+        document.getElementById('expense-desc').value = '';
+        document.getElementById('expense-amount').value = '';
+        updateDashboard();
+    }
+
+    function deleteExpense(id) {
+        expenses = expenses.filter(e => e.id !== id);
+        localStorage.setItem('vn_expenses', JSON.stringify(expenses));
+        updateDashboard();
+    }
+
+    function renderExpenses() {
+        const list = document.getElementById('expense-list');
+        list.innerHTML = '';
+        
+        const grouped = expenses.reduce((acc, exp) => {
+            if (!acc[exp.date]) acc[exp.date] = [];
+            acc[exp.date].push(exp);
+            return acc;
+        }, {});
+
+        const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+        sortedDates.forEach(date => {
+            const dailyTotal = grouped[date].reduce((sum, exp) => sum + exp.amount, 0);
+            
+            const headerRow = document.createElement('tr');
+            headerRow.innerHTML = `<td colspan="4" class="day-header">📅 ${date} - Total del día: ${formatNumber(dailyTotal)} VND</td>`;
+            list.appendChild(headerRow);
+
+            grouped[date].forEach(exp => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${exp.date}</td>
+                    <td>${exp.desc}</td>
+                    <td>${formatNumber(exp.amount)}</td>
+                    <td><button class="delete-btn" onclick="deleteExpense(${exp.id})">X</button></td>
+                `;
+                list.appendChild(row);
+            });
+        });
+    }
+
+    updateDashboard();
+</script>
+
+</body>
+</html>

@@ -24,25 +24,27 @@
         button { background-color: #2E5077; color: white; border: none; cursor: pointer; transition: background 0.3s; font-weight: bold; }
         button:hover { background-color: #1a365d; }
         
-        /* Estilos del Cotizador */
         .sidebar input { width: 100%; padding: 10px; font-size: 1.1em; border: none; border-radius: 5px; margin-bottom: 15px; text-align: center; color: #333; }
         .conversion-results { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
         .conv-item { display: flex; justify-content: space-between; font-size: 1.1em; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px; }
-        .conv-item:last-child { border-bottom: none; }
-        .sidebar small { display: block; text-align: center; margin-top: 15px; font-size: 0.8em; color: #b0c4de; }
-
+        
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background-color: #2E5077; color: white; }
         .day-header { background-color: #bbdefb; font-weight: bold; text-align: center; color: #0d47a1; }
-        .delete-btn { background-color: #d32f2f; padding: 5px 10px; font-size: 0.9em; border-radius: 4px; color: white; border: none; cursor: pointer; width: auto; }
-        .delete-btn:hover { background-color: #b71c1c; }
         
+        .actions-cell { display: flex; gap: 5px; }
+        .btn-action { padding: 5px 8px; font-size: 0.9em; border-radius: 4px; color: white; border: none; cursor: pointer; }
+        .edit-btn { background-color: #f39c12; }
+        .delete-btn { background-color: #d32f2f; }
+        
+        .backup-section { margin-top: 40px; padding: 20px; border-top: 2px dashed #ccc; text-align: center; }
+        .backup-btns { display: flex; gap: 10px; margin-top: 10px; }
+
         @media (max-width: 768px) {
             .main-wrapper { flex-direction: column; }
             .sidebar { position: static; order: -1; }
             .card { flex: 1 1 100%; }
-            th, td { padding: 8px 5px; font-size: 0.9em; }
         }
     </style>
 </head>
@@ -58,7 +60,7 @@
             <div class="conv-item"><span>🇯🇵 JPY</span> <span id="conv-jpy">0.00</span></div>
             <div class="conv-item"><span>🇦🇷 ARS (Blue)</span> <span id="conv-ars">0.00</span></div>
         </div>
-        <small id="rate-update-time">Conectando para obtener tasas en vivo...</small>
+        <small id="rate-update-time">Actualizando tasas...</small>
     </div>
 
     <div class="main-content">
@@ -67,16 +69,16 @@
         <div class="dashboard">
             <div class="card">Gastos Hoy <span id="gastos-hoy">0</span></div>
             <div class="card">Gastos Ayer <span id="gastos-ayer">0</span></div>
-            <div class="card highlight">Gasto Promedio/Día <span id="promedio-diario">0</span></div>
+            <div class="card highlight">Promedio Diario <span id="promedio-diario">0</span></div>
             <div class="card">Total Gastado <span id="total-gastado">0</span></div>
             <div class="card">Total Cambiado <span id="total-cambiado">0</span></div>
             <div class="card highlight">Saldo Disponible <span id="saldo">0</span></div>
         </div>
 
-        <h2>Cambiar Dólares a Dongs</h2>
+        <h2>Cambiar USD a VND</h2>
         <div class="form-section">
             <input type="number" id="usd-amount" placeholder="Cantidad de USD">
-            <input type="number" id="exchange-rate" placeholder="Tasa de cambio (Ej. 25400)">
+            <input type="number" id="exchange-rate" placeholder="Tasa (Ej. 25400)">
             <button onclick="addExchange()">Agregar Cambio</button>
         </div>
 
@@ -84,257 +86,204 @@
         <div style="overflow-x:auto; margin-bottom: 30px;">
             <table>
                 <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Monto (USD)</th>
-                        <th>Tasa (VND)</th>
-                        <th>Total (VND)</th>
-                        <th>Acción</th>
-                    </tr>
+                    <tr><th>Fecha</th><th>USD</th><th>Tasa</th><th>VND</th><th>Acciones</th></tr>
                 </thead>
-                <tbody id="exchange-list">
-                    </tbody>
+                <tbody id="exchange-list"></tbody>
             </table>
         </div>
 
         <h2>Registrar Gasto</h2>
         <div class="form-section">
             <input type="date" id="expense-date">
-            <input type="text" id="expense-desc" placeholder="Descripción (Ej. Grab, Pho, Hotel)">
+            <input type="text" id="expense-desc" placeholder="Descripción (Grab, Pho, etc)">
             <input type="number" id="expense-amount" placeholder="Monto en VND">
             <button onclick="addExpense()">Agregar Gasto</button>
         </div>
 
-        <h2>Lista de Gastos por Día</h2>
+        <h2>Lista de Gastos</h2>
         <div style="overflow-x:auto;">
             <table>
                 <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Descripción</th>
-                        <th>Monto (VND)</th>
-                        <th>Acción</th>
-                    </tr>
+                    <tr><th>Fecha</th><th>Descripción</th><th>VND</th><th>Acciones</th></tr>
                 </thead>
-                <tbody id="expense-list">
-                    </tbody>
+                <tbody id="expense-list"></tbody>
             </table>
+        </div>
+
+        <div class="backup-section">
+            <h3>Copia de Seguridad 💾</h3>
+            <p style="font-size: 0.8em; color: #666;">Exportá tus datos para no perderlos si cambias de celu.</p>
+            <div class="backup-btns">
+                <button onclick="exportData()" style="background-color: #27ae60;">Exportar Datos</button>
+                <button onclick="importData()" style="background-color: #2980b9;">Importar Datos</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    // --- LÓGICA DEL COTIZADOR ---
     let exchangeRates = {};
     let dolarBlueVenta = 0;
+    let exchanges = JSON.parse(localStorage.getItem('vn_exchanges')) || [];
+    let expenses = JSON.parse(localStorage.getItem('vn_expenses')) || [];
 
     async function fetchRates() {
         try {
             const responseVND = await fetch('https://open.er-api.com/v6/latest/VND');
             const dataVND = await responseVND.json();
             exchangeRates = dataVND.rates;
-            
             const responseBlue = await fetch('https://dolarapi.com/v1/dolares/blue');
             const dataBlue = await responseBlue.json();
             dolarBlueVenta = dataBlue.venta;
-            
-            const lastUpdate = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            document.getElementById('rate-update-time').innerText = `Tasas actualizadas a las ${lastUpdate} hs`;
-            convertCurrency(); 
-        } catch (error) {
-            document.getElementById('rate-update-time').innerText = "Modo offline: usando tasas estimadas";
+            document.getElementById('rate-update-time').innerText = `Tasas OK - Blue: $${dolarBlueVenta}`;
+            convertCurrency();
+        } catch (e) {
+            document.getElementById('rate-update-time').innerText = "Modo Offline";
             exchangeRates = { USD: 0.000039, EUR: 0.000036, JPY: 0.0059 };
-            dolarBlueVenta = 1200; 
+            dolarBlueVenta = 1100;
             convertCurrency();
         }
     }
 
-    function formatCurrencyValue(value, currencyCode) {
-        return new Intl.NumberFormat('es-AR', { style: 'currency', currency: currencyCode, minimumFractionDigits: 2 }).format(value);
-    }
+    function formatNumber(num) { return new Intl.NumberFormat('es-AR').format(num); }
 
     function convertCurrency() {
         const vnd = parseFloat(document.getElementById('quick-vnd').value) || 0;
-        if(Object.keys(exchangeRates).length > 0) {
-            const usdValue = vnd * exchangeRates.USD;
-            
-            document.getElementById('conv-usd').innerText = formatCurrencyValue(usdValue, 'USD');
-            document.getElementById('conv-eur').innerText = formatCurrencyValue(vnd * exchangeRates.EUR, 'EUR');
-            document.getElementById('conv-jpy').innerText = formatCurrencyValue(vnd * exchangeRates.JPY, 'JPY');
-            
-            const arsBlueValue = usdValue * dolarBlueVenta;
-            document.getElementById('conv-ars').innerText = formatCurrencyValue(arsBlueValue, 'ARS');
+        if(exchangeRates.USD) {
+            const usd = vnd * exchangeRates.USD;
+            document.getElementById('conv-usd').innerText = `U$D ${usd.toFixed(2)}`;
+            document.getElementById('conv-eur').innerText = `€ ${(vnd * exchangeRates.EUR).toFixed(2)}`;
+            document.getElementById('conv-jpy').innerText = `¥ ${(vnd * exchangeRates.JPY).toFixed(0)}`;
+            document.getElementById('conv-ars').innerText = `$ ${formatNumber(Math.round(usd * dolarBlueVenta))}`;
         }
     }
 
-    fetchRates();
-
-    // --- LÓGICA DE GASTOS Y CAMBIOS ---
-    let exchanges = JSON.parse(localStorage.getItem('vn_exchanges')) || [];
-    let expenses = JSON.parse(localStorage.getItem('vn_expenses')) || [];
-
-    // Normalizar datos viejos (por si guardaste cambios sin ID previamente)
-    exchanges = exchanges.map((ex, idx) => {
-        if (!ex.id) ex.id = Date.now() + idx; // Asignar un ID a los viejos
-        if (ex.date && ex.date.includes('T')) ex.date = ex.date.split('T')[0]; // Dejar la fecha limpia
-        return ex;
-    });
-
-    function getLocalYYYYMMDD(dateObj) {
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    document.getElementById('expense-date').value = getLocalYYYYMMDD(new Date());
-
-    function formatNumber(num) {
-        return new Intl.NumberFormat('es-AR').format(num);
-    }
+    function getToday() { return new Date().toISOString().split('T')[0]; }
+    document.getElementById('expense-date').value = getToday();
 
     function updateDashboard() {
         const totalCambiado = exchanges.reduce((acc, curr) => acc + curr.vnd, 0);
         const totalGastado = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-        const saldo = totalCambiado - totalGastado;
-
+        
         document.getElementById('total-cambiado').innerText = formatNumber(totalCambiado);
         document.getElementById('total-gastado').innerText = formatNumber(totalGastado);
-        document.getElementById('saldo').innerText = formatNumber(saldo);
+        document.getElementById('saldo').innerText = formatNumber(totalCambiado - totalGastado);
 
-        const hoyStr = getLocalYYYYMMDD(new Date());
-        const ayerObj = new Date();
-        ayerObj.setDate(ayerObj.getDate() - 1);
-        const ayerStr = getLocalYYYYMMDD(ayerObj);
-
-        const gastosHoy = expenses.filter(e => e.date === hoyStr).reduce((acc, curr) => acc + curr.amount, 0);
-        const gastosAyer = expenses.filter(e => e.date === ayerStr).reduce((acc, curr) => acc + curr.amount, 0);
-
+        const hoy = getToday();
+        const gastosHoy = expenses.filter(e => e.date === hoy).reduce((acc, curr) => acc + curr.amount, 0);
         document.getElementById('gastos-hoy').innerText = formatNumber(gastosHoy);
-        document.getElementById('gastos-ayer').innerText = formatNumber(gastosAyer);
 
         if (expenses.length > 0) {
-            const dates = expenses.map(e => new Date(e.date));
-            const minDate = new Date(Math.min(...dates));
-            const maxDate = new Date(Math.max(...dates));
-            const diffTime = Math.abs(maxDate - minDate);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
-            
-            const promedio = totalGastado / diffDays;
-            document.getElementById('promedio-diario').innerText = formatNumber(Math.round(promedio));
-        } else {
-            document.getElementById('promedio-diario').innerText = "0";
+            const dates = [...new Set(expenses.map(e => e.date))];
+            document.getElementById('promedio-diario').innerText = formatNumber(Math.round(totalGastado / dates.length));
         }
 
-        renderExchanges();
-        renderExpenses();
+        localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
+        localStorage.setItem('vn_expenses', JSON.stringify(expenses));
+        renderTables();
     }
 
     function addExchange() {
         const usd = parseFloat(document.getElementById('usd-amount').value);
         const rate = parseFloat(document.getElementById('exchange-rate').value);
-        
-        if (!usd || !rate) {
-            alert('Por favor, completá los dólares y la tasa de cambio.');
-            return;
+        if (usd && rate) {
+            exchanges.push({ id: Date.now(), usd, rate, vnd: usd * rate, date: getToday() });
+            updateDashboard();
+            document.getElementById('usd-amount').value = '';
         }
-
-        const vnd = usd * rate;
-        const date = getLocalYYYYMMDD(new Date());
-        exchanges.push({ id: Date.now(), usd, rate, vnd, date });
-        localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
-        
-        document.getElementById('usd-amount').value = '';
-        document.getElementById('exchange-rate').value = '';
-        updateDashboard();
-    }
-
-    // NUEVA FUNCIÓN: Borrar Cambio
-    function deleteExchange(id) {
-        exchanges = exchanges.filter(e => e.id !== id);
-        localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
-        updateDashboard();
     }
 
     function addExpense() {
         const date = document.getElementById('expense-date').value;
         const desc = document.getElementById('expense-desc').value;
         const amount = parseFloat(document.getElementById('expense-amount').value);
-
-        if (!date || !desc || !amount) {
-            alert('Por favor, completá todos los datos del gasto.');
-            return;
+        if (date && desc && amount) {
+            expenses.push({ id: Date.now(), date, desc, amount });
+            updateDashboard();
+            document.getElementById('expense-desc').value = '';
+            document.getElementById('expense-amount').value = '';
         }
+    }
 
-        expenses.push({ id: Date.now(), date, desc, amount });
-        localStorage.setItem('vn_expenses', JSON.stringify(expenses));
-        
-        document.getElementById('expense-desc').value = '';
-        document.getElementById('expense-amount').value = '';
+    function deleteItem(id, type) {
+        if (confirm('¿Borrar este registro?')) {
+            if (type === 'ex') exchanges = exchanges.filter(i => i.id !== id);
+            else expenses = expenses.filter(i => i.id !== id);
+            updateDashboard();
+        }
+    }
+
+    function editItem(id, type) {
+        if (type === 'ex') {
+            const item = exchanges.find(i => i.id === id);
+            const newUSD = prompt("Nuevo monto en USD:", item.usd);
+            const newRate = prompt("Nueva tasa:", item.rate);
+            if (newUSD && newRate) {
+                item.usd = parseFloat(newUSD);
+                item.rate = parseFloat(newRate);
+                item.vnd = item.usd * item.rate;
+            }
+        } else {
+            const item = expenses.find(i => i.id === id);
+            const newDesc = prompt("Nueva descripción:", item.desc);
+            const newAmount = prompt("Nuevo monto en VND:", item.amount);
+            if (newDesc && newAmount) {
+                item.desc = newDesc;
+                item.amount = parseFloat(newAmount);
+            }
+        }
         updateDashboard();
     }
 
-    function deleteExpense(id) {
-        expenses = expenses.filter(e => e.id !== id);
-        localStorage.setItem('vn_expenses', JSON.stringify(expenses));
-        updateDashboard();
+    function renderTables() {
+        const exList = document.getElementById('exchange-list');
+        exList.innerHTML = exchanges.map(ex => `
+            <tr>
+                <td>${ex.date}</td><td>${ex.usd}</td><td>${formatNumber(ex.rate)}</td><td>${formatNumber(ex.vnd)}</td>
+                <td class="actions-cell">
+                    <button class="btn-action edit-btn" onclick="editItem(${ex.id}, 'ex')">✏️</button>
+                    <button class="btn-action delete-btn" onclick="deleteItem(${ex.id}, 'ex')">X</button>
+                </td>
+            </tr>
+        `).join('');
+
+        const expList = document.getElementById('expense-list');
+        expList.innerHTML = expenses.sort((a,b) => b.date.localeCompare(a.date)).map(exp => `
+            <tr>
+                <td>${exp.date}</td><td>${exp.desc}</td><td>${formatNumber(exp.amount)}</td>
+                <td class="actions-cell">
+                    <button class="btn-action edit-btn" onclick="editItem(${exp.id}, 'exp')">✏️</button>
+                    <button class="btn-action delete-btn" onclick="deleteItem(${exp.id}, 'exp')">X</button>
+                </td>
+            </tr>
+        `).join('');
     }
 
-    // NUEVA FUNCIÓN: Renderizar tabla de cambios
-    function renderExchanges() {
-        const list = document.getElementById('exchange-list');
-        list.innerHTML = '';
-        
-        // Ordenar del más nuevo al más viejo
-        const sortedExchanges = [...exchanges].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        sortedExchanges.forEach(ex => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${ex.date}</td>
-                <td>USD ${formatNumber(ex.usd)}</td>
-                <td>${formatNumber(ex.rate)}</td>
-                <td>${formatNumber(ex.vnd)}</td>
-                <td><button class="delete-btn" onclick="deleteExchange(${ex.id})">X</button></td>
-            `;
-            list.appendChild(row);
-        });
+    function exportData() {
+        const data = JSON.stringify({ exchanges, expenses });
+        const blob = new Blob([data], { type: 'text/plain' });
+        const text = btoa(data);
+        prompt("Copiá este código de seguridad y guardalo en algún lugar seguro:", text);
     }
 
-    function renderExpenses() {
-        const list = document.getElementById('expense-list');
-        list.innerHTML = '';
-        
-        const grouped = expenses.reduce((acc, exp) => {
-            if (!acc[exp.date]) acc[exp.date] = [];
-            acc[exp.date].push(exp);
-            return acc;
-        }, {});
-
-        const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
-
-        sortedDates.forEach(date => {
-            const dailyTotal = grouped[date].reduce((sum, exp) => sum + exp.amount, 0);
-            
-            const headerRow = document.createElement('tr');
-            headerRow.innerHTML = `<td colspan="4" class="day-header">📅 ${date} - Total del día: ${formatNumber(dailyTotal)} VND</td>`;
-            list.appendChild(headerRow);
-
-            grouped[date].forEach(exp => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${exp.date}</td>
-                    <td>${exp.desc}</td>
-                    <td>${formatNumber(exp.amount)}</td>
-                    <td><button class="delete-btn" onclick="deleteExpense(${exp.id})">X</button></td>
-                `;
-                list.appendChild(row);
-            });
-        });
+    function importData() {
+        const code = prompt("Pegá acá el código de seguridad que exportaste:");
+        if (code) {
+            try {
+                const decoded = JSON.parse(atob(code));
+                if (confirm("Se van a sobreescribir tus datos actuales. ¿Continuar?")) {
+                    exchanges = decoded.exchanges;
+                    expenses = decoded.expenses;
+                    updateDashboard();
+                }
+            } catch (e) { alert("Código inválido."); }
+        }
     }
 
+    fetchRates();
     updateDashboard();
 </script>
-
 </body>
 </html>
+
+        

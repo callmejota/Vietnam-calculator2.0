@@ -80,6 +80,23 @@
             <button onclick="addExchange()">Agregar Cambio</button>
         </div>
 
+        <h2>Historial de Cambios</h2>
+        <div style="overflow-x:auto; margin-bottom: 30px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Monto (USD)</th>
+                        <th>Tasa (VND)</th>
+                        <th>Total (VND)</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="exchange-list">
+                    </tbody>
+            </table>
+        </div>
+
         <h2>Registrar Gasto</h2>
         <div class="form-section">
             <input type="date" id="expense-date">
@@ -152,9 +169,16 @@
 
     fetchRates();
 
-    // --- LÓGICA DE GASTOS ---
+    // --- LÓGICA DE GASTOS Y CAMBIOS ---
     let exchanges = JSON.parse(localStorage.getItem('vn_exchanges')) || [];
     let expenses = JSON.parse(localStorage.getItem('vn_expenses')) || [];
+
+    // Normalizar datos viejos (por si guardaste cambios sin ID previamente)
+    exchanges = exchanges.map((ex, idx) => {
+        if (!ex.id) ex.id = Date.now() + idx; // Asignar un ID a los viejos
+        if (ex.date && ex.date.includes('T')) ex.date = ex.date.split('T')[0]; // Dejar la fecha limpia
+        return ex;
+    });
 
     function getLocalYYYYMMDD(dateObj) {
         const year = dateObj.getFullYear();
@@ -202,6 +226,7 @@
             document.getElementById('promedio-diario').innerText = "0";
         }
 
+        renderExchanges();
         renderExpenses();
     }
 
@@ -215,11 +240,19 @@
         }
 
         const vnd = usd * rate;
-        exchanges.push({ usd, rate, vnd, date: new Date().toISOString() });
+        const date = getLocalYYYYMMDD(new Date());
+        exchanges.push({ id: Date.now(), usd, rate, vnd, date });
         localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
         
         document.getElementById('usd-amount').value = '';
         document.getElementById('exchange-rate').value = '';
+        updateDashboard();
+    }
+
+    // NUEVA FUNCIÓN: Borrar Cambio
+    function deleteExchange(id) {
+        exchanges = exchanges.filter(e => e.id !== id);
+        localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
         updateDashboard();
     }
 
@@ -245,6 +278,27 @@
         expenses = expenses.filter(e => e.id !== id);
         localStorage.setItem('vn_expenses', JSON.stringify(expenses));
         updateDashboard();
+    }
+
+    // NUEVA FUNCIÓN: Renderizar tabla de cambios
+    function renderExchanges() {
+        const list = document.getElementById('exchange-list');
+        list.innerHTML = '';
+        
+        // Ordenar del más nuevo al más viejo
+        const sortedExchanges = [...exchanges].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        sortedExchanges.forEach(ex => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${ex.date}</td>
+                <td>USD ${formatNumber(ex.usd)}</td>
+                <td>${formatNumber(ex.rate)}</td>
+                <td>${formatNumber(ex.vnd)}</td>
+                <td><button class="delete-btn" onclick="deleteExchange(${ex.id})">X</button></td>
+            `;
+            list.appendChild(row);
+        });
     }
 
     function renderExpenses() {

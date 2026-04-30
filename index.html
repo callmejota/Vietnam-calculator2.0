@@ -39,7 +39,7 @@
         .delete-btn { background-color: #d32f2f; }
         
         .backup-section { margin-top: 40px; padding: 20px; border-top: 2px dashed #ccc; text-align: center; }
-        .backup-btns { display: flex; gap: 10px; margin-top: 10px; }
+        .backup-btns { display: flex; gap: 10px; margin-top: 10px; justify-content: center; }
 
         @media (max-width: 768px) {
             .main-wrapper { flex-direction: column; }
@@ -100,7 +100,7 @@
             <button onclick="addExpense()">Agregar Gasto</button>
         </div>
 
-        <h2>Lista de Gastos</h2>
+        <h2>Lista de Gastos por Día</h2>
         <div style="overflow-x:auto;">
             <table>
                 <thead>
@@ -124,8 +124,14 @@
 <script>
     let exchangeRates = {};
     let dolarBlueVenta = 0;
+    
+    // Cargar datos sin borrar nada
     let exchanges = JSON.parse(localStorage.getItem('vn_exchanges')) || [];
     let expenses = JSON.parse(localStorage.getItem('vn_expenses')) || [];
+
+    // Validar datos viejos para que no se rompan
+    exchanges = exchanges.map((ex, idx) => ({...ex, id: ex.id || Date.now() + idx}));
+    expenses = expenses.map((exp, idx) => ({...exp, id: exp.id || Date.now() + idx}));
 
     async function fetchRates() {
         try {
@@ -140,7 +146,7 @@
         } catch (e) {
             document.getElementById('rate-update-time').innerText = "Modo Offline";
             exchangeRates = { USD: 0.000039, EUR: 0.000036, JPY: 0.0059 };
-            dolarBlueVenta = 1100;
+            dolarBlueVenta = 1200;
             convertCurrency();
         }
     }
@@ -158,8 +164,14 @@
         }
     }
 
-    function getToday() { return new Date().toISOString().split('T')[0]; }
-    document.getElementById('expense-date').value = getToday();
+    function getLocalYYYYMMDD(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    document.getElementById('expense-date').value = getLocalYYYYMMDD(new Date());
 
     function updateDashboard() {
         const totalCambiado = exchanges.reduce((acc, curr) => acc + curr.vnd, 0);
@@ -169,13 +181,22 @@
         document.getElementById('total-gastado').innerText = formatNumber(totalGastado);
         document.getElementById('saldo').innerText = formatNumber(totalCambiado - totalGastado);
 
-        const hoy = getToday();
-        const gastosHoy = expenses.filter(e => e.date === hoy).reduce((acc, curr) => acc + curr.amount, 0);
+        const hoyStr = getLocalYYYYMMDD(new Date());
+        const ayerObj = new Date();
+        ayerObj.setDate(ayerObj.getDate() - 1);
+        const ayerStr = getLocalYYYYMMDD(ayerObj);
+
+        const gastosHoy = expenses.filter(e => e.date === hoyStr).reduce((acc, curr) => acc + curr.amount, 0);
+        const gastosAyer = expenses.filter(e => e.date === ayerStr).reduce((acc, curr) => acc + curr.amount, 0);
+
         document.getElementById('gastos-hoy').innerText = formatNumber(gastosHoy);
+        document.getElementById('gastos-ayer').innerText = formatNumber(gastosAyer);
 
         if (expenses.length > 0) {
             const dates = [...new Set(expenses.map(e => e.date))];
             document.getElementById('promedio-diario').innerText = formatNumber(Math.round(totalGastado / dates.length));
+        } else {
+            document.getElementById('promedio-diario').innerText = "0";
         }
 
         localStorage.setItem('vn_exchanges', JSON.stringify(exchanges));
@@ -187,9 +208,10 @@
         const usd = parseFloat(document.getElementById('usd-amount').value);
         const rate = parseFloat(document.getElementById('exchange-rate').value);
         if (usd && rate) {
-            exchanges.push({ id: Date.now(), usd, rate, vnd: usd * rate, date: getToday() });
+            exchanges.push({ id: Date.now(), usd, rate, vnd: usd * rate, date: getLocalYYYYMMDD(new Date()) });
             updateDashboard();
             document.getElementById('usd-amount').value = '';
+            document.getElementById('exchange-rate').value = '';
         }
     }
 
@@ -216,28 +238,41 @@
     function editItem(id, type) {
         if (type === 'ex') {
             const item = exchanges.find(i => i.id === id);
+            if (!item) return;
             const newUSD = prompt("Nuevo monto en USD:", item.usd);
-            const newRate = prompt("Nueva tasa:", item.rate);
-            if (newUSD && newRate) {
+            if (newUSD === null) return; 
+            const newRate = prompt("Nueva tasa de cambio:", item.rate);
+            if (newRate === null) return;
+
+            if (!isNaN(newUSD) && !isNaN(newRate) && newUSD !== "" && newRate !== "") {
                 item.usd = parseFloat(newUSD);
                 item.rate = parseFloat(newRate);
                 item.vnd = item.usd * item.rate;
+                updateDashboard();
+            } else {
+                alert("Por favor, ingresá números válidos.");
             }
         } else {
             const item = expenses.find(i => i.id === id);
+            if (!item) return;
             const newDesc = prompt("Nueva descripción:", item.desc);
+            if (newDesc === null) return;
             const newAmount = prompt("Nuevo monto en VND:", item.amount);
-            if (newDesc && newAmount) {
+            if (newAmount === null) return;
+
+            if (newDesc.trim() !== '' && !isNaN(newAmount) && newAmount !== "") {
                 item.desc = newDesc;
                 item.amount = parseFloat(newAmount);
+                updateDashboard();
+            } else {
+                alert("Datos inválidos. Intentá de nuevo.");
             }
         }
-        updateDashboard();
     }
 
     function renderTables() {
         const exList = document.getElementById('exchange-list');
-        exList.innerHTML = exchanges.map(ex => `
+        exList.innerHTML = exchanges.sort((a,b) => new Date(b.date) - new Date(a.date)).map(ex => `
             <tr>
                 <td>${ex.date}</td><td>${ex.usd}</td><td>${formatNumber(ex.rate)}</td><td>${formatNumber(ex.vnd)}</td>
                 <td class="actions-cell">
@@ -248,35 +283,58 @@
         `).join('');
 
         const expList = document.getElementById('expense-list');
-        expList.innerHTML = expenses.sort((a,b) => b.date.localeCompare(a.date)).map(exp => `
-            <tr>
-                <td>${exp.date}</td><td>${exp.desc}</td><td>${formatNumber(exp.amount)}</td>
-                <td class="actions-cell">
-                    <button class="btn-action edit-btn" onclick="editItem(${exp.id}, 'exp')">✏️</button>
-                    <button class="btn-action delete-btn" onclick="deleteItem(${exp.id}, 'exp')">X</button>
-                </td>
-            </tr>
-        `).join('');
+        expList.innerHTML = '';
+        
+        // Agrupar gastos por fecha
+        const grouped = expenses.reduce((acc, exp) => {
+            if (!acc[exp.date]) acc[exp.date] = [];
+            acc[exp.date].push(exp);
+            return acc;
+        }, {});
+
+        const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+        sortedDates.forEach(date => {
+            const dailyTotal = grouped[date].reduce((sum, exp) => sum + exp.amount, 0);
+            
+            // Fila de cabecera por día
+            expList.innerHTML += `<tr><td colspan="4" class="day-header">📅 ${date} - Total del día: ${formatNumber(dailyTotal)} VND</td></tr>`;
+
+            // Filas de gastos de ese día
+            grouped[date].forEach(exp => {
+                expList.innerHTML += `
+                    <tr>
+                        <td>${exp.date}</td>
+                        <td>${exp.desc}</td>
+                        <td>${formatNumber(exp.amount)}</td>
+                        <td class="actions-cell">
+                            <button class="btn-action edit-btn" onclick="editItem(${exp.id}, 'exp')">✏️</button>
+                            <button class="btn-action delete-btn" onclick="deleteItem(${exp.id}, 'exp')">X</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        });
     }
 
     function exportData() {
         const data = JSON.stringify({ exchanges, expenses });
-        const blob = new Blob([data], { type: 'text/plain' });
-        const text = btoa(data);
-        prompt("Copiá este código de seguridad y guardalo en algún lugar seguro:", text);
+        const text = btoa(unescape(encodeURIComponent(data))); // Más seguro para caracteres especiales
+        prompt("Copiá este código y guardalo en un lugar seguro (bloc de notas, whatsapp, etc):", text);
     }
 
     function importData() {
         const code = prompt("Pegá acá el código de seguridad que exportaste:");
         if (code) {
             try {
-                const decoded = JSON.parse(atob(code));
-                if (confirm("Se van a sobreescribir tus datos actuales. ¿Continuar?")) {
-                    exchanges = decoded.exchanges;
-                    expenses = decoded.expenses;
+                const decoded = JSON.parse(decodeURIComponent(escape(atob(code))));
+                if (confirm("Se van a sobreescribir tus datos actuales de la pantalla. ¿Continuar?")) {
+                    exchanges = decoded.exchanges || [];
+                    expenses = decoded.expenses || [];
                     updateDashboard();
+                    alert("Datos restaurados correctamente.");
                 }
-            } catch (e) { alert("Código inválido."); }
+            } catch (e) { alert("Código inválido o dañado."); }
         }
     }
 
@@ -285,5 +343,3 @@
 </script>
 </body>
 </html>
-
-        
